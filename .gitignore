@@ -1,0 +1,13 @@
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+.eslintcache
+yarn-error.log
+dist
+storybook-static
+.vercel
+.env
+.DS_Store

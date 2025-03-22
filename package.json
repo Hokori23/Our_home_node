@@ -1,0 +1,61 @@
+{
+  "name": "our_home_node",
+  "version": "1.0.0",
+  "description": "our_home_node",
+  "author": "Hokori",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon --watch src --ext ts --exec 'npm run build:swc && cross-env NODE_ENV=development node dist/src/app.js'",
+    "build:swc": "cross-env NODE_ENV=production swc src --out-dir dist",
+    "build": "tsc -p tsconfig.prod.json",
+    "start": "node dist/src/app.js",
+    "start:watch": "nodemon --watch dist dist/src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hokori23/Our_home_node.git"
+  },
+  "keywords": [
+    "TypeScript",
+    "Sequelize",
+    "Express",
+    "React",
+    "Blog"
+  ],
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Hokori23/Our_home_node/issues"
+  },
+  "homepage": "https://github.com/Hokori23/Our_home_node",
+  "dependencies": {
+    "axios": "^0.21.0",
+    "dotenv": "^16.0.0",
+    "jsonwebtoken": "^8.5.1",
+    "koa": "^2.16.0",
+    "koa-router": "^13.0.1",
+    "moment": "^2.29.1",
+    "mysql2": "^2.1.0",
+    "sequelize": "^6.3.5",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^16.3.0",
+    "@commitlint/config-conventional": "^16.2.4",
+    "@swc/cli": "^0.6.0",
+    "@swc/core": "^1.11.8",
+    "@types/koa": "^2.15.0",
+    "@types/koa-router": "^7.4.8",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
+    "chokidar": "^4.0.3",
+    "eslint": "^9.22.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,mjsx,cjs,cjsx}": [
+      "eslint --fix --color",
+      "git add"
+    ]
+  }
+}
