@@ -2,7 +2,7 @@ import { Context } from 'koa';
 import User, { UserSchema } from '@/models/user';
 import { validate } from '@/utils/sequelizeToZod';
 
-export const CreateUserSchema = UserSchema.omit({ id: true });
+export const CreateUserSchema = UserSchema.omit({ id: true, createdAt: true, updatedAt: true });
 
 export default {
   // 获取用户列表
@@ -27,7 +27,7 @@ export default {
   async createUser(ctx: Context) {
     try {
       validate(ctx.request.body, CreateUserSchema);
-      const { account, password, nickName, associatedUid, avatar } = ctx.request.body;
+      const { account, password, nickName, associatedUid, avatar } = ctx.request.body as any;
       const user = await User.create({
         account,
         password,
@@ -46,7 +46,7 @@ export default {
   // 更新用户
   async updateUser(ctx: Context) {
     const { id } = ctx.params;
-    const { account, password, nickName, associatedUid, avatar } = ctx.request.body;
+    const { account, password, nickName, associatedUid, avatar } = ctx.request.body as any;
     try {
       const [affectedCount] = await User.update(
         { account, password, nickName, associatedUid, avatar },
@@ -74,6 +74,6 @@ export default {
       ctx.body = { error: 'User not found' };
       return;
     }
-    ctx.status = 204;
+    ctx.status = 200;
   },
 };

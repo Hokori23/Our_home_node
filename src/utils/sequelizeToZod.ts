@@ -1,6 +1,5 @@
 import { z, ZodNumber, ZodString } from 'zod';
 import { ModelAttributeColumnOptions, DataTypes } from 'sequelize';
-import { Context } from 'koa';
 
 export function sequelizeToZod(modelAttributes: { [key: string]: ModelAttributeColumnOptions }) {
   const schema: Record<string, z.ZodTypeAny> = {};
@@ -87,7 +86,15 @@ export function sequelizeToZod(modelAttributes: { [key: string]: ModelAttributeC
     }
 
     // 处理 allowNull
-    if (!options.allowNull) {
+    if (options.allowNull) {
+      if (validator instanceof z.ZodString) {
+        validator = validator.optional();
+      } else if (validator instanceof z.ZodNumber) {
+        validator = validator.optional();
+      } else if (validator instanceof z.ZodArray) {
+        validator = validator.optional();
+      }
+    } else if (!options.primaryKey) {
       if (validator instanceof z.ZodString) {
         validator = validator.min(1);
       } else if (validator instanceof z.ZodNumber) {
@@ -98,7 +105,6 @@ export function sequelizeToZod(modelAttributes: { [key: string]: ModelAttributeC
     }
     schema[key] = validator;
   }
-
   return z.object(schema);
 }
 
