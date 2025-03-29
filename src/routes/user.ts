@@ -1,13 +1,17 @@
 import Router from 'koa-router';
-import UserController from '@/controllers/user'; // 等价于 ./controllers/user.ts
+import UserController from '@/controllers/user';
+import auth from '@/middlewares/auth';
 
 const router = new Router({ prefix: '/users' });
 
-// 路由挂载
-router.get('/all', UserController.getUserList); // GET /users/all
-router.get('/:id', UserController.getUserById); // GET /users/:id
-router.post('/create', UserController.createUser); // POST /users/create
-router.post('/update/:id', UserController.updateUser); // POST /users/update/:id
-router.post('/delete/:id', UserController.deleteUser); // POST /users/delete/:id
+// 公开路由
+router.post('/register', UserController.register);
+router.post('/login', UserController.login);
+router.get('/all', UserController.getUserList);
+
+// 需要认证的路由
+router.get('/:id', auth(), UserController.getUserById);
+router.post('/update/:id', auth(), UserController.updateUser);
+router.post('/delete/:id', auth(), UserController.deleteUser);
 
 export default router;

@@ -7,6 +7,10 @@ import { isDev } from '@/consts';
 dotenv.config();
 
 console.log('current environment: ', process.env.NODE_ENV);
+// 确保ACCESS_TOKEN_SECRET存在
+if (!process.env.ACCESS_TOKEN_SECRET) {
+  throw new Error('ACCESS_TOKEN_SECRET is not defined in environment variables');
+}
 const app = new Koa();
 
 // 使用路由

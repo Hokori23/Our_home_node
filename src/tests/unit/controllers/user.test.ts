@@ -2,139 +2,228 @@ import request from 'supertest';
 import app from '@/app';
 import { sequelize } from '@/database';
 import User from '@/models/user';
+import bcrypt from 'bcrypt';
+import { CodeDictionary } from '@/utils/restful';
 
-describe('User Routes Integration Test', () => {
+// 新增测试辅助函数
+const expectSuccess = (res: any, data?: any) => {
+  expect(res.status).toBe(200);
+  expect(res.body.code).toBe(CodeDictionary.SUCCESS);
+  if (data) {
+    expect(res.body.data).toMatchObject(data);
+  }
+};
+
+const expectError = (res: any, code: CodeDictionary) => {
+  expect(res.status).toBe(200); // 注意：HTTP状态码始终为200
+  expect(res.body.code).toBe(code);
+  expect(res.body.message).toBeDefined();
+};
+
+describe('User Controller (Integration Test)', () => {
   beforeAll(async () => {
-    await sequelize.sync({ force: true }); // 初始化数据库
+    await sequelize.sync({ force: true }); // 同步数据库结构
   });
 
   beforeEach(async () => {
     await User.destroy({ where: {} }); // 清空测试数据
   });
 
-  // 测试数据准备函数
-  const createTestUser = async (data = {}) => {
-    return await User.create({
-      account: 'testuser',
-      password: 'Testpass123!',
-      nickName: 'Test User',
-      ...data,
+  describe('POST /users/register - 用户注册', () => {
+    it('应成功注册新用户', async () => {
+      const newUser = {
+        account: 'testuser',
+        password: 'Testpass123!',
+        nickName: 'Test User',
+      };
+      const response = await request(app.callback()).post('/users/register').send(newUser);
+
+      expectSuccess(response, {
+        user: {
+          account: 'testuser',
+          nickName: 'Test User',
+        },
+        token: expect.any(String),
+      });
     });
-  };
 
-  // 1. 测试 GET /users/all
-  describe('GET /users/all - 获取所有用户', () => {
-    it('应返回空数组当没有用户时', async () => {
-      const res = await request(app.callback()).get('/users/all').expect(200);
+    it('应拒绝重复账号', async () => {
+      const user = { account: 'testuser', password: 'Testpass123!' };
+      await User.create(user);
+      const response = await request(app.callback()).post('/users/register').send(user);
 
-      expect(res.body).toEqual([]);
-    });
-
-    it('应返回正确的用户列表', async () => {
-      await createTestUser({ account: 'user1' });
-      await createTestUser({ account: 'user2' });
-
-      const res = await request(app.callback()).get('/users/all').expect(200);
-
-      expect(res.body.length).toBe(2);
-      expect(res.body[0].account).toBe('user1');
-      expect(res.body[1].account).toBe('user2');
+      expectError(response, CodeDictionary.ACCOUNT_EXISTS);
     });
   });
 
-  // 2. 测试 POST /users/create
-  describe('POST /users/create - 创建用户', () => {
-    const validUserData = {
-      account: 'newuser',
-      password: 'ValidPass123!',
-      nickName: 'New User',
-    };
-
-    it('应成功创建用户并返回201状态码', async () => {
-      const res = await request(app.callback())
-        .post('/users/create')
-        .send(validUserData)
-        .expect(200);
-
-      expect(res.body.account).toBe(validUserData.account);
-
-      // 验证数据库记录
-      const dbUser = await User.findOne({ where: { account: 'newuser' } });
-      expect(dbUser).not.toBeNull();
+  describe('POST /users/login - 用户登录', () => {
+    beforeEach(async () => {
+      await User.create({
+        account: 'testuser',
+        password: await bcrypt.hash('Testpass123!', 10),
+        nickName: 'Test User',
+      });
     });
 
-    it('应拒绝无效数据并返回400状态码', async () => {
-      const res = await request(app.callback())
-        .post('/users/create')
-        .send({ account: '', password: 'short' })
-        .expect(400);
+    it('应成功登录并返回Token', async () => {
+      const response = await request(app.callback()).post('/users/login').send({
+        account: 'testuser',
+        password: 'Testpass123!',
+      });
 
-      expect(res.body.error).toContain('String must contain at least');
-    });
-  });
-
-  // 3. 测试 GET /users/:id
-  describe('GET /users/:id - 获取单个用户', () => {
-    it('应返回正确的用户数据', async () => {
-      const user = await createTestUser();
-
-      const res = await request(app.callback()).get(`/users/${user.id}`).expect(200);
-
-      expect(res.body.id).toBe(user.id);
-      expect(res.body.account).toBe('testuser');
+      expectSuccess(response, {
+        user: {
+          account: 'testuser',
+          nickName: 'Test User',
+        },
+        token: expect.any(String),
+      });
     });
 
-    it('应返回404当用户不存在时', async () => {
-      const res = await request(app.callback()).get('/users/9999').expect(404);
+    it('应拒绝错误密码', async () => {
+      const response = await request(app.callback()).post('/users/login').send({
+        account: 'testuser',
+        password: 'wrongpass',
+      });
 
-      expect(res.body.error).toBe('User not found');
+      expectError(response, CodeDictionary.PASSWORD_ERROR);
     });
   });
 
-  // 4. 测试 POST /users/update/:id
-  describe('POST /users/update/:id - 更新用户', () => {
-    it('应成功更新用户信息', async () => {
-      const user = await createTestUser();
-      const updates = { nickName: 'Updated Name' };
+  describe('GET /users/all', () => {
+    it('应当返回空数组', async () => {
+      const response = await request(app.callback()).get('/users/all');
 
-      const res = await request(app.callback())
-        .post(`/users/update/${user.id}`)
+      expectSuccess(response, []);
+    });
+
+    it('应当返回正确用户列表', async () => {
+      // 准备测试数据
+      const usersData = [
+        { account: 'user1', password: 'pass1', nickName: 'User One' },
+        { account: 'user2', password: 'pass2', nickName: 'User Two' },
+      ];
+      await User.bulkCreate(usersData);
+
+      const response = await request(app.callback()).get('/users/all');
+
+      expectSuccess(response, usersData);
+    });
+  });
+
+  describe('GET /users/:id', () => {
+    it('按id查询用户账号', async () => {
+      const userData = {
+        account: 'testuser',
+        password: 'testpass',
+        nickName: 'Test User',
+      };
+
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
+
+      const response = await request(app.callback())
+        .get(`/users/${registerRes.body.data.user.id}`)
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
+
+      expectSuccess(response, userData);
+    });
+
+    it('查不到该用户', async () => {
+      const userData = {
+        account: 'testuser2',
+        password: 'testpass',
+        nickName: 'Test User',
+      };
+
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
+
+      const response = await request(app.callback())
+        .get('/users/9999')
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
+
+      expectError(response, CodeDictionary.ACCOUNT_NOT_FOUND);
+    });
+  });
+
+  describe('POST /users/update/:id', () => {
+    it('更新用户信息', async () => {
+      const userData = {
+        account: 'original',
+        password: 'originalPass',
+        nickName: 'Original User',
+      };
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
+
+      const updates = {
+        nickName: 'Updated Name',
+        avatar: 'https://new-avatar.jpg',
+      };
+
+      const response = await request(app.callback())
+        .post(`/users/update/${registerRes.body.data.user.id}`)
         .send(updates)
-        .expect(200);
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
 
-      expect(res.body.nickName).toBe('Updated Name');
+      expectSuccess(response, {
+        ...userData,
+        ...updates,
+      });
 
       // 验证数据库更新
-      const updatedUser = await User.findByPk(user.id);
-      expect(updatedUser?.nickName).toBe('Updated Name');
+      const updatedUser = await User.findByPk(response.body.data.id);
+      expect(updatedUser?.nickName).toBe(updates.nickName);
     });
 
-    it('应返回404当更新不存在的用户时', async () => {
-      const res = await request(app.callback())
+    it('更新他人账号', async () => {
+      const userData = {
+        account: 'original2',
+        password: 'originalPass',
+        nickName: 'Original User',
+      };
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
+
+      const response = await request(app.callback())
         .post('/users/update/9999')
         .send({ nickName: 'New Name' })
-        .expect(404);
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
 
-      expect(res.body.error).toBe('User not found');
+      expectError(response, CodeDictionary.PERMISSION_DENIED);
     });
   });
 
-  // 5. 测试 POST /users/delete/:id
-  describe('POST /users/delete/:id - 删除用户', () => {
-    it('应成功删除用户并返回200', async () => {
-      const user = await createTestUser();
+  describe('POST /users/delete/:id', () => {
+    it('删除自己账号', async () => {
+      const userData = {
+        account: 'original3',
+        password: 'originalPass',
+        nickName: 'Original User',
+      };
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
 
-      await request(app.callback()).post(`/users/delete/${user.id}`).expect(200);
+      const response = await request(app.callback())
+        .post(`/users/delete/${registerRes.body.data.user.id}`)
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
 
-      // 验证数据库记录已删除
-      const deletedUser = await User.findByPk(user.id);
+      expectSuccess(response);
+
+      // 验证是否真的删除
+      const deletedUser = await User.findByPk(registerRes.body.data.user.id.id);
       expect(deletedUser).toBeNull();
     });
 
-    it('应返回404当删除不存在的用户时', async () => {
-      const res = await request(app.callback()).post('/users/delete/9999').expect(404);
+    it('删除他人账号', async () => {
+      const userData = {
+        account: 'original4',
+        password: 'originalPass',
+        nickName: 'Original User',
+      };
+      const registerRes = await request(app.callback()).post('/users/register').send(userData);
 
-      expect(res.body.error).toBe('User not found');
+      const response = await request(app.callback())
+        .post('/users/delete/9999')
+        .set('Authorization', `Bearer ${registerRes.body.data.token}`);
+
+      expectError(response, CodeDictionary.PERMISSION_DENIED);
     });
   });
 

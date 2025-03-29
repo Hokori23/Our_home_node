@@ -32,7 +32,9 @@
   },
   "homepage": "https://github.com/Hokori23/Our_home_node",
   "dependencies": {
+    "@types/bcrypt": "^5.0.2",
     "axios": "^0.21.0",
+    "bcrypt": "^5.1.1",
     "dotenv": "^16.0.0",
     "jsonwebtoken": "^8.5.1",
     "koa": "^2.16.0",
@@ -50,6 +52,7 @@
     "@swc/cli": "^0.6.0",
     "@swc/core": "^1.11.8",
     "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/koa": "^2.15.0",
     "@types/koa-bodyparser": "^4.3.12",
     "@types/koa-router": "^7.4.8",
